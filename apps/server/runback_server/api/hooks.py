@@ -1,4 +1,4 @@
-"""Hook ingest endpoint."""
+"""Hook ingest endpoint: dedupe, archive, normalize, broadcast SSE."""
 from __future__ import annotations
 
 from typing import Any
@@ -14,13 +14,15 @@ from runback_server.ingest.archive import (
     record_event_key,
 )
 from runback_server.ingest.normalizer import Normalizer
+from runback_server.ingest.publish_queue import publish_scope
 from runback_server.schemas.hook_events import parse_hook_event
+from runback_server.sse import bus
 
 router = APIRouter()
 
 
 @router.post("/claude", status_code=status.HTTP_202_ACCEPTED)
-def ingest_claude_hook(
+async def ingest_claude_hook(
     payload: dict[str, Any],
     x_runback_run_id: str = Header(..., alias="x-runback-run-id"),
 ) -> dict[str, Any]:
@@ -43,6 +45,10 @@ def ingest_claude_hook(
         return {"accepted": True, "run_id": x_runback_run_id, "duplicate": True}
 
     archive.append(payload)
-    Normalizer(runtime_root=settings.runtime_root).handle(run_id=x_runback_run_id, payload=payload)
+
+    with publish_scope() as queue:
+        Normalizer(runtime_root=settings.runtime_root).handle(run_id=x_runback_run_id, payload=payload)
+        await queue.drain(bus)
+
     record_event_key(archive, event_key)
     return {"accepted": True, "run_id": x_runback_run_id, "duplicate": False}

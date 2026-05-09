@@ -8,8 +8,10 @@ from sqlmodel import Session, select
 
 from runback_server.classifier import classify
 from runback_server.ingest.ids import edge_id, node_id
+from runback_server.ingest.publish_queue import get_current_publish_queue
 from runback_server.models import Edge, Node, Run
 from runback_server.schemas.hook_events import HookEvent
+from runback_server.schemas.sse_events import EdgeCreatedPayload, NodeCreatedPayload, NodeUpdatedPayload
 from runback_server.side_effects import ledger
 
 
@@ -30,15 +32,65 @@ def _add_sequence_edge(session: Session, run: Run, target_node_id: str) -> None:
     source_node_id = _last_node_id(session, run)
     if source_node_id is None or source_node_id == target_node_id:
         return
+    eid = edge_id()
     session.add(
         Edge(
-            id=edge_id(),
+            id=eid,
             run_id=run.id,
             branch_id=run.current_branch_id,
             source_node_id=source_node_id,
             target_node_id=target_node_id,
             edge_type="sequence",
         )
+    )
+    queue = get_current_publish_queue()
+    if queue is not None:
+        queue.enqueue_edge_created(
+            run_id=run.id,
+            payload=EdgeCreatedPayload(
+                edge_id=eid,
+                branch_id=run.current_branch_id,
+                source_node_id=source_node_id,
+                target_node_id=target_node_id,
+                edge_type="sequence",
+            ),
+        )
+
+
+def _enqueue_node_created(run: Run, node: Node) -> None:
+    queue = get_current_publish_queue()
+    if queue is None:
+        return
+    queue.enqueue_node_created(
+        run_id=run.id,
+        payload=NodeCreatedPayload(
+            node_id=node.id,
+            branch_id=node.branch_id,
+            group_id=node.group_id,
+            type=node.type,
+            label=node.label,
+            tool_name=node.tool_name,
+            recovery_policy=node.recovery_policy,
+            status=node.status,
+        ),
+    )
+
+
+def _enqueue_node_updated(run: Run, node: Node) -> None:
+    queue = get_current_publish_queue()
+    if queue is None:
+        return
+    queue.enqueue_node_updated(
+        run_id=run.id,
+        payload=NodeUpdatedPayload(
+            node_id=node.id,
+            status=node.status,
+            output_preview=node.output_preview,
+            error=node.error,
+            duration_ms=node.duration_ms,
+            recovery_policy=node.recovery_policy,
+            classification_reason=node.classification_reason,
+        ),
     )
 
 
@@ -76,6 +128,8 @@ def apply_user_prompt(session: Session, run: Run, evt: HookEvent) -> Node:
     )
     _add_sequence_edge(session, run, node.id)
     session.add(node)
+    session.flush()
+    _enqueue_node_created(run, node)
     return node
 
 
@@ -101,6 +155,7 @@ def apply_pre(session: Session, run: Run, evt: HookEvent) -> Node:
     session.add(node)
     session.flush()
     ledger.record_pre(session, run, node, evt)
+    _enqueue_node_created(run, node)
     return node
 
 
@@ -135,6 +190,7 @@ def _ensure_node_for_orphan_post(session: Session, run: Run, evt: HookEvent) -> 
     _add_sequence_edge(session, run, node.id)
     session.add(node)
     session.flush()
+    _enqueue_node_created(run, node)
     return node
 
 
@@ -169,6 +225,8 @@ def apply_post(session: Session, run: Run, evt: HookEvent) -> Node:
         node.status = "success"
         _finish_duration(node)
         ledger.record_post(session, run, node, evt)
+    session.flush()
+    _enqueue_node_updated(run, node)
     return node
 
 
@@ -197,4 +255,6 @@ def apply_post_failure(session: Session, run: Run, evt: HookEvent) -> Node:
     _finish_duration(node)
     if run.failure_node_id is None:
         run.failure_node_id = node.id
+    session.flush()
+    _enqueue_node_updated(run, node)
     return node

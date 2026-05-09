@@ -30,6 +30,8 @@ def test_every_documented_endpoint_responds(client):
             for param in operation.get("parameters", []):
                 if param.get("in") == "path":
                     url = url.replace("{" + param["name"] + "}", "dummy")
+            if method == "get" and "/events" in url:
+                continue  # SSE streams indefinitely if consumed via TestClient.request (see test_sse_endpoint).
             resp = client.request(method.upper(), url, headers={"x-runback-run-id": "dummy"})
             assert resp.status_code != 405, f"{method.upper()} {path} not registered"
             assert resp.status_code in {200, 201, 202, 400, 404, 422, 501}
