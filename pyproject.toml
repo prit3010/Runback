@@ -16,4 +16,7 @@ select = ["E", "F", "I", "B", "UP", "N", "W"]
 
 [tool.pytest.ini_options]
 testpaths = ["apps/server/tests", "packages/runback-cli/tests"]
-addopts = "-ra --strict-markers"
+addopts = "-ra --strict-markers -m 'not slow'"
+markers = [
+  "slow: requires Claude Code installed and burns API quota",
+]
