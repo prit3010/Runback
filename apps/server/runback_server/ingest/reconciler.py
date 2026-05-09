@@ -6,9 +6,11 @@ from typing import Any
 
 from sqlmodel import Session, select
 
+from runback_server.classifier import classify
 from runback_server.ingest.ids import edge_id, node_id
 from runback_server.models import Edge, Node, Run
 from runback_server.schemas.hook_events import HookEvent
+from runback_server.side_effects import ledger
 
 
 def _now() -> datetime:
@@ -79,6 +81,7 @@ def apply_user_prompt(session: Session, run: Run, evt: HookEvent) -> Node:
 
 def apply_pre(session: Session, run: Run, evt: HookEvent) -> Node:
     tool_use_id = evt.tool_use_id or f"anon_{node_id()}"
+    classification = classify(evt.tool_name or "", evt.tool_input)
     node = Node(
         id=node_id(),
         run_id=run.id,
@@ -90,11 +93,14 @@ def apply_pre(session: Session, run: Run, evt: HookEvent) -> Node:
         tool_name=evt.tool_name,
         input_json=evt.tool_input,
         status="running",
-        recovery_policy="unknown",
+        recovery_policy=classification.recovery_policy,
+        classification_reason=classification.classification_reason,
         started_at=_now(),
     )
     _add_sequence_edge(session, run, node.id)
     session.add(node)
+    session.flush()
+    ledger.record_pre(session, run, node, evt)
     return node
 
 
@@ -103,13 +109,14 @@ def _find_pending_node(session: Session, run: Run, tool_use_id: str) -> Node | N
         select(Node).where(
             Node.run_id == run.id,
             Node.claude_tool_use_id == tool_use_id,
-            Node.status == "running",
+            Node.status.in_(["running", "reused"]),  # type: ignore[attr-defined]
         )
     ).all()
     return rows[0] if rows else None
 
 
 def _ensure_node_for_orphan_post(session: Session, run: Run, evt: HookEvent) -> Node:
+    classification = classify(evt.tool_name or "", evt.tool_input)
     node = Node(
         id=node_id(),
         run_id=run.id,
@@ -121,7 +128,8 @@ def _ensure_node_for_orphan_post(session: Session, run: Run, evt: HookEvent) -> 
         tool_name=evt.tool_name,
         input_json=evt.tool_input,
         status="running",
-        recovery_policy="unknown",
+        recovery_policy=classification.recovery_policy,
+        classification_reason=classification.classification_reason,
         started_at=_now(),
     )
     _add_sequence_edge(session, run, node.id)
@@ -157,8 +165,10 @@ def apply_post(session: Session, run: Run, evt: HookEvent) -> Node:
             response.persisted_output_size,
         )
 
-    node.status = "success"
-    _finish_duration(node)
+    if node.status != "reused":
+        node.status = "success"
+        _finish_duration(node)
+        ledger.record_post(session, run, node, evt)
     return node
 
 
