@@ -11,7 +11,7 @@ from sqlmodel import Session
 
 from runback_server.db import engine
 from runback_server.ingest.ids import branch_id, replay_id
-from runback_server.models import ReplayAttempt, Run
+from runback_server.models import Checkpoint, ReplayAttempt, Run
 from runback_server.replay.launcher import LauncherError, ReplayLaunchPayload, send_replay
 from runback_server.replay.recovery import select_recovery
 from runback_server.replay.resume_prompt import build_resume_prompt
@@ -99,12 +99,15 @@ def replay_run(run_id: str, body: ReplayRequestBody) -> dict[str, Any]:
         session.commit()
         session.refresh(attempt)
 
+        checkpoint = session.get(Checkpoint, recommendation.recommended_checkpoint_id)
         payload = ReplayLaunchPayload(
             run_id=run_id,
             checkpoint_id=recommendation.recommended_checkpoint_id,
             new_branch_id=new_branch,
             resume_prompt=resume_prompt,
             replay_id=replay_attempt_id,
+            git_ref=checkpoint.git_ref if checkpoint is not None else None,
+            workspace_path=checkpoint.workspace_path if checkpoint is not None else None,
         )
         try:
             ack = send_replay(payload)

@@ -25,6 +25,7 @@ router = APIRouter()
 async def ingest_claude_hook(
     payload: dict[str, Any],
     x_runback_run_id: str = Header(..., alias="x-runback-run-id"),
+    x_runback_branch_id: str | None = Header(default=None, alias="x-runback-branch-id"),
 ) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise HTTPException(status_code=400, detail="payload must be a JSON object")
@@ -47,7 +48,11 @@ async def ingest_claude_hook(
     archive.append(payload)
 
     with publish_scope() as queue:
-        Normalizer(runtime_root=settings.runtime_root).handle(run_id=x_runback_run_id, payload=payload)
+        Normalizer(runtime_root=settings.runtime_root).handle(
+            run_id=x_runback_run_id,
+            payload=payload,
+            branch_id_override=x_runback_branch_id or None,
+        )
         await queue.drain(bus)
 
     record_event_key(archive, event_key)

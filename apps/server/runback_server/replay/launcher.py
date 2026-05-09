@@ -34,9 +34,11 @@ class ReplayLaunchPayload:
     new_branch_id: str
     resume_prompt: str
     replay_id: str
+    git_ref: str | None = None
+    workspace_path: str | None = None
 
     def to_wire(self) -> dict[str, Any]:
-        payload = asdict(self)
+        payload = {key: value for key, value in asdict(self).items() if value is not None}
         payload["action"] = "replay"
         return payload
 
