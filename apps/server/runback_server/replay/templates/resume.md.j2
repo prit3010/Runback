@@ -1,0 +1,60 @@
+You are resuming a Runback-managed Claude Code workflow from a checkpoint.
+
+# Original task
+{{ original_prompt }}
+
+# Workspace state
+The repository has been restored to the checkpoint: **{{ checkpoint_label }}**.
+
+Do NOT redo any of the work below. Treat completed work as authoritative.
+
+{% if completed_groups -%}
+# Completed work (do not redo)
+{% for g in completed_groups -%}
+- **{{ g.label }}** - status: {{ g.status }}{% if g.external_refs %} (refs: {{ g.external_refs | join(', ') }}){% endif %}
+{% endfor %}
+{%- endif %}
+
+{% if cached_artifacts -%}
+# Cached artifacts available on disk (read these instead of regenerating)
+{% for a in cached_artifacts -%}
+- {{ a.description }} - `{{ a.path }}`
+{% endfor %}
+{%- endif %}
+
+{% if already_executed_side_effects -%}
+# ALREADY EXECUTED - DO NOT FIRE AGAIN
+The following side effects have already executed in the original run. Each is logged
+in Runback's side-effect ledger by idempotency key. Do not re-run these commands.
+If you need to verify their state, read the existing references rather than calling them.
+
+{% for se in already_executed_side_effects -%}
+- **{{ se.kind }}** -> `{{ se.external_ref or '(no ref)' }}` (key: `{{ se.key }}`)
+{% endfor %}
+{%- endif %}
+
+# What failed
+The previous attempt failed at: **{{ failed_node_label }}**.
+
+{% if failure_output -%}
+## Failure output (last excerpt)
+```
+{{ failure_output }}
+```
+{%- endif %}
+
+{% if user_context -%}
+# Steering from the developer
+{{ user_context }}
+{%- endif %}
+
+# Your task now
+Continue from the restored checkpoint. Focus on getting past the failure point.
+{% if scope_instruction -%}
+{{ scope_instruction }}
+{%- else -%}
+Do not redo completed work above unless absolutely necessary. Run only the verification
+steps required to prove your fix works.
+{%- endif %}
+
+End the run by emitting a final TodoWrite update marking remaining work as completed.

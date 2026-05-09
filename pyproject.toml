@@ -1,0 +1,19 @@
+[project]
+name = "runback-workspace"
+version = "0.0.0"
+description = "Runback monorepo workspace root"
+requires-python = ">=3.11"
+
+[tool.uv.workspace]
+members = ["apps/server", "packages/runback-cli"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "N", "W"]
+
+[tool.pytest.ini_options]
+testpaths = ["apps/server/tests", "packages/runback-cli/tests"]
+addopts = "-ra --strict-markers"

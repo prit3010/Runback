@@ -1,0 +1,10 @@
+{
+  "name": "runback",
+  "private": true,
+  "version": "0.0.0",
+  "packageManager": "pnpm@9.0.0",
+  "scripts": {
+    "typecheck": "pnpm --filter web typecheck",
+    "test:web": "pnpm --filter web test"
+  }
+}

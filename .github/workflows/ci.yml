@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+        with:
+          python-version: "3.11"
+      - run: uv sync --extra dev
+        working-directory: apps/server
+      - run: uv pip install -e ".[dev]"
+        working-directory: packages/runback-cli
+      - name: pytest server
+        run: uv run pytest -v
+        working-directory: apps/server
+      - name: pytest cli
+        run: uv run pytest -v
+        working-directory: packages/runback-cli
+      - name: alembic upgrade smoke
+        run: |
+          rm -f /tmp/runback-ci.db
+          RUNBACK_DB_PATH=/tmp/runback-ci.db uv run alembic upgrade head
+          sqlite3 /tmp/runback-ci.db ".tables" | tee /tmp/tables.out
+          grep -q "node" /tmp/tables.out
+        working-directory: apps/server
+      - name: ruff
+        run: uv run ruff check .
+        working-directory: apps/server
+
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install
+      - run: pnpm --filter web typecheck
+      - run: pnpm --filter web test
+
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install openapi-spec-validator pyyaml
+      - name: validate openapi.yaml
+        run: python -c "import yaml; from openapi_spec_validator import validate; validate(yaml.safe_load(open('docs/contracts/openapi.yaml')))"

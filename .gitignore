@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.venv/
+venv/
+.coverage
+htmlcov/
+dist/
+build/
+
+# Node
+node_modules/
+.next/
+.turbo/
+*.tsbuildinfo
+.pnpm-store/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Runback runtime
+.runback/*
+!.runback/.gitkeep
+.claude/settings.local.json
+
+# Env files
+.env
+.env.local
+.env.*.local
+docs/
+.spikes/

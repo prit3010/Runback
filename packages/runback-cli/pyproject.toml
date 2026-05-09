@@ -1,0 +1,27 @@
+[project]
+name = "runback-cli"
+version = "0.0.0"
+description = "Runback CLI and runner daemon"
+requires-python = ">=3.11"
+dependencies = [
+  "click>=8.1",
+  "httpx>=0.27",
+  "rich>=13.9",
+  "ulid-py>=1.1",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3",
+  "ruff>=0.7",
+]
+
+[project.scripts]
+runback = "runback.__main__:cli"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["runback"]
