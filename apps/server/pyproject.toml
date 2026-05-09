@@ -38,5 +38,5 @@ packages = ["runback_server"]
 [tool.pytest.ini_options]
 addopts = "-ra --strict-markers -m 'not slow'"
 markers = [
-  "slow: requires Claude Code installed and burns API quota",
+  "slow: optional heavy tests (Claude CLI quota, full SSE smoke); excluded from default runs via -m 'not slow'",
 ]

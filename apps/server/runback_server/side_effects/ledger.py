@@ -8,8 +8,10 @@ from sqlmodel import Session, select
 
 from runback_server.classifier import classify
 from runback_server.classifier.keys import derive_key, derive_key_for_post
+from runback_server.ingest.publish_queue import get_current_publish_queue
 from runback_server.models import Node, Run, SideEffectLog
 from runback_server.schemas.hook_events import HookEvent
+from runback_server.schemas.sse_events import SideEffectLoggedPayload
 
 
 def _now() -> datetime:
@@ -20,6 +22,22 @@ _PR_URL = re.compile(r"https?://[^\s]*github\.com/[^\s]+/pull/\d+")
 _SLACK_TS = re.compile(r"\bts=([0-9.]+)\b")
 _PUSH_SHA_RANGE = re.compile(r"\b([0-9a-f]{3,40})\.\.([0-9a-f]{3,40})\b")
 _HTTP_STATUS = re.compile(r"\bHTTP/[0-9.]+\s+(\d{3})\b")
+
+
+def _enqueue_executed_row(run: Run, node: Node, row: SideEffectLog) -> None:
+    queue = get_current_publish_queue()
+    if queue is None:
+        return
+    queue.enqueue_side_effect_logged(
+        run_id=run.id,
+        payload=SideEffectLoggedPayload(
+            node_id=node.id,
+            kind=row.kind,
+            idempotency_key=row.idempotency_key,
+            status=row.status,
+            external_ref=row.external_ref,
+        ),
+    )
 
 
 def extract_external_ref(kind: str, stdout: str | None, stderr: str | None) -> str | None:
@@ -135,6 +153,7 @@ def record_post(
         if existing.executed_at is None:
             existing.executed_at = _now()
         session.add(existing)
+        _enqueue_executed_row(run, node, existing)
         return existing
 
     row = SideEffectLog(
@@ -150,4 +169,5 @@ def record_post(
     )
     session.add(row)
     session.flush()
+    _enqueue_executed_row(run, node, row)
     return row

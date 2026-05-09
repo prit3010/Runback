@@ -8,8 +8,10 @@ from typing import Any
 from sqlmodel import Field, Session, SQLModel, select
 
 from runback_server.ingest.ids import group_id
+from runback_server.ingest.publish_queue import get_current_publish_queue
 from runback_server.models import RunGroup
 from runback_server.schemas.hook_events import HookEvent
+from runback_server.schemas.sse_events import GroupClosedPayload, GroupOpenedPayload
 
 _TICKET_RE = re.compile(r"^Ticket #\d+:", re.IGNORECASE)
 
@@ -38,6 +40,7 @@ def _detect_kind(content: str) -> str:
 def apply_todowrite(session: Session, run_id: str, evt: HookEvent) -> None:
     """Process a TodoWrite PreToolUse payload and emit RunGroup transitions."""
     todos: list[dict[str, Any]] = (evt.tool_input or {}).get("todos", []) or []
+    queue = get_current_publish_queue()
     for todo in todos:
         content = (todo.get("content") or "").strip()
         new_status = (todo.get("status") or "").strip()
@@ -72,6 +75,16 @@ def apply_todowrite(session: Session, run_id: str, evt: HookEvent) -> None:
             else:
                 prev.last_status = new_status
                 prev.open_group_id = gid
+            if queue is not None:
+                queue.enqueue_group_opened(
+                    run_id=run_id,
+                    payload=GroupOpenedPayload(
+                        group_id=gid,
+                        parent_group_id=None,
+                        label=content,
+                        kind=_detect_kind(content),
+                    ),
+                )
             continue
 
         if prev_status == "in_progress" and new_status in {"completed", "cancelled"}:
@@ -81,6 +94,14 @@ def apply_todowrite(session: Session, run_id: str, evt: HookEvent) -> None:
                 if group is not None and group.ended_at is None:
                     group.status = "success" if new_status == "completed" else "failed"
                     group.ended_at = _now()
+                    if queue is not None:
+                        queue.enqueue_group_closed(
+                            run_id=run_id,
+                            payload=GroupClosedPayload(
+                                group_id=gid,
+                                status="success" if new_status == "completed" else "failed",
+                            ),
+                        )
             if prev:
                 prev.last_status = new_status
                 prev.open_group_id = None
