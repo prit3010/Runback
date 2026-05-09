@@ -11,6 +11,7 @@ from threading import Thread
 import httpx
 import pytest
 import uvicorn
+from tests.fixtures.fake_runner import FakeRunner
 
 os.environ.setdefault("RUNBACK_DB_PATH", "/tmp/runback-server-tests.db")
 os.environ.setdefault("RUNBACK_RUNTIME_ROOT", "/tmp/runback-server-tests")
@@ -27,6 +28,13 @@ from sqlmodel import SQLModel
 @pytest.fixture
 def anyio_backend() -> str:
     return "asyncio"
+
+
+@pytest.fixture
+def fake_runner(tmp_path):
+    runner = FakeRunner(socket_dir=tmp_path)
+    yield runner
+    runner.stop()
 
 
 @pytest.fixture(autouse=True)
