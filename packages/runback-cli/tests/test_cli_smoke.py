@@ -19,12 +19,19 @@ def test_subcommand_helps():
         assert result.exit_code == 0, f"{subcommand} --help failed: {result.output}"
 
 
-def test_each_subcommand_stub_exits_nonzero_when_invoked():
+def test_init_exits_nonzero_outside_git_repo(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    result = CliRunner().invoke(cli, ["init"])
+    assert result.exit_code != 0
+    assert "git" in result.output.lower()
+
+
+def test_long_running_subcommands_are_not_stubs():
     runner = CliRunner()
-    for subcommand in ("init", "dev", "runner"):
-        result = runner.invoke(cli, [subcommand])
-        assert result.exit_code != 0
-        assert "Not implemented" in result.output
+    for subcommand in ("dev", "runner"):
+        result = runner.invoke(cli, [subcommand, "--help"])
+        assert result.exit_code == 0
+        assert "Not implemented" not in result.output
 
 
 def test_claude_requires_prompt():

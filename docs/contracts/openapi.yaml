@@ -1,0 +1,443 @@
+openapi: 3.1.0
+info:
+  title: Runback API
+  version: 0.0.0
+  description: Backend API for Runback.
+servers:
+  - url: http://localhost:8000
+paths:
+  /api/hooks/claude:
+    post:
+      summary: Ingest a Claude Code hook event
+      operationId: ingestClaudeHook
+      parameters:
+        - in: header
+          name: x-runback-run-id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        "202": { description: Event accepted }
+        "400": { description: Malformed payload }
+        "501": { description: Not implemented }
+  /api/flows:
+    get:
+      summary: List flows
+      operationId: listFlows
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/Flow" } }
+        "501": { description: Not implemented }
+    post:
+      summary: Create flow
+      operationId: createFlow
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FlowCreate" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Flow" }
+        "501": { description: Not implemented }
+  /api/flows/{flowId}:
+    get:
+      summary: Get flow
+      operationId: getFlow
+      parameters:
+        - { in: path, name: flowId, required: true, schema: { type: string } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Flow" } } } }
+        "404": { description: Not found }
+        "501": { description: Not implemented }
+  /api/flows/{flowId}/run:
+    post:
+      summary: Trigger flow run
+      operationId: runFlow
+      parameters:
+        - { in: path, name: flowId, required: true, schema: { type: string } }
+      responses:
+        "202": { description: Run queued, content: { application/json: { schema: { $ref: "#/components/schemas/Run" } } } }
+        "501": { description: Not implemented }
+  /api/runs:
+    get:
+      summary: List runs
+      operationId: listRuns
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Run" } } } } }
+        "501": { description: Not implemented }
+    post:
+      summary: Create a Run
+      operationId: createRun
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RunCreate" }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/Run" } } } }
+        "409": { description: Run already exists }
+  /api/runs/{runId}:
+    get:
+      summary: Get run
+      operationId: getRun
+      parameters:
+        - { in: path, name: runId, required: true, schema: { type: string } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Run" } } } }
+        "404": { description: Not found }
+        "501": { description: Not implemented }
+  /api/runs/{runId}/dag:
+    get:
+      summary: Get run DAG
+      operationId: getRunDag
+      parameters:
+        - { in: path, name: runId, required: true, schema: { type: string } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/RunDag" } } } }
+        "501": { description: Not implemented }
+  /api/runs/{runId}/checkpoints:
+    post:
+      summary: Persist a checkpoint produced by the runner
+      operationId: createCheckpoint
+      parameters:
+        - { in: path, name: runId, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CheckpointCreate" }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/Checkpoint" } } } }
+        "404": { description: Unknown run }
+  /api/runs/{runId}/events:
+    get:
+      summary: SSE stream of run events
+      operationId: streamRunEvents
+      parameters:
+        - { in: path, name: runId, required: true, schema: { type: string } }
+      responses:
+        "200": { description: Streaming response, content: { text/event-stream: { schema: { type: string } } } }
+        "501": { description: Not implemented }
+  /api/runs/{runId}/nodes/{nodeId}:
+    get:
+      summary: Get node detail
+      operationId: getNode
+      parameters:
+        - { in: path, name: runId, required: true, schema: { type: string } }
+        - { in: path, name: nodeId, required: true, schema: { type: string } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/NodeDetail" } } } }
+        "501": { description: Not implemented }
+  /api/runs/{runId}/nodes/{nodeId}/policy:
+    post:
+      summary: Override node policy
+      operationId: overrideNodePolicy
+      parameters:
+        - { in: path, name: runId, required: true, schema: { type: string } }
+        - { in: path, name: nodeId, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PolicyOverride" }
+      responses:
+        "200": { description: Updated }
+        "501": { description: Not implemented }
+  /api/runs/{runId}/replay:
+    post:
+      summary: Replay a run from a node
+      operationId: replayRun
+      parameters:
+        - { in: path, name: runId, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReplayRequest" }
+      responses:
+        "202": { description: Replay started, content: { application/json: { schema: { $ref: "#/components/schemas/ReplayAttempt" } } } }
+        "501": { description: Not implemented }
+  /api/runs/{runId}/replay/recommendation:
+    get:
+      summary: Get replay recommendation
+      operationId: getReplayRecommendation
+      parameters:
+        - { in: path, name: runId, required: true, schema: { type: string } }
+        - { in: query, name: node_id, required: true, schema: { type: string } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/ReplayRecommendation" } } } }
+        "501": { description: Not implemented }
+  /api/runners:
+    get:
+      summary: List runners
+      operationId: listRunners
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Runner" } } } } }
+        "501": { description: Not implemented }
+  /api/runners/heartbeat:
+    post:
+      summary: Runner heartbeat
+      operationId: runnerHeartbeat
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RunnerHeartbeat" }
+      responses:
+        "200": { description: OK }
+        "501": { description: Not implemented }
+components:
+  schemas:
+    Flow:
+      type: object
+      required: [id, name, repo_path, agent, active_version_id, enabled, created_at, updated_at]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        description: { type: [string, "null"] }
+        repo_path: { type: string }
+        agent: { type: string }
+        active_version_id: { type: string }
+        schedule: { type: [string, "null"] }
+        enabled: { type: boolean }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    FlowCreate:
+      type: object
+      required: [name, repo_path, prompt]
+      properties:
+        name: { type: string }
+        description: { type: string }
+        repo_path: { type: string }
+        prompt: { type: string }
+        schedule: { type: string }
+        replay_mode: { type: string, enum: [manual, semi_automatic, automatic] }
+        side_effect_policy: { type: string, enum: [label_only, require_approval, block_dangerous] }
+    Run:
+      type: object
+      required: [id, run_kind, status, original_prompt, repo_path, root_branch_id, current_branch_id, created_at]
+      properties:
+        id: { type: string }
+        flow_id: { type: [string, "null"] }
+        flow_version_id: { type: [string, "null"] }
+        runner_id: { type: [string, "null"] }
+        run_kind: { type: string, enum: [ad_hoc, registered_flow, scheduled] }
+        status: { type: string, enum: [queued, running, failed, success, cancelled] }
+        original_prompt: { type: string }
+        repo_path: { type: string }
+        workspace_path: { type: [string, "null"] }
+        root_branch_id: { type: string }
+        current_branch_id: { type: string }
+        failure_node_id: { type: [string, "null"] }
+        started_at: { type: [string, "null"], format: date-time }
+        ended_at: { type: [string, "null"], format: date-time }
+        created_at: { type: string, format: date-time }
+    RunCreate:
+      type: object
+      required: [id, run_kind, status, original_prompt, repo_path, root_branch_id, current_branch_id]
+      properties:
+        id: { type: string }
+        flow_id: { type: [string, "null"] }
+        flow_version_id: { type: [string, "null"] }
+        runner_id: { type: [string, "null"] }
+        run_kind: { type: string }
+        status: { type: string }
+        original_prompt: { type: string }
+        repo_path: { type: string }
+        workspace_path: { type: [string, "null"] }
+        root_branch_id: { type: string }
+        current_branch_id: { type: string }
+    RunDag:
+      type: object
+      required: [run, nodes, edges, checkpoints, groups]
+      properties:
+        run: { $ref: "#/components/schemas/Run" }
+        nodes: { type: array, items: { $ref: "#/components/schemas/NodeSummary" } }
+        edges: { type: array, items: { $ref: "#/components/schemas/Edge" } }
+        checkpoints: { type: array, items: { $ref: "#/components/schemas/Checkpoint" } }
+        groups: { type: array, items: { $ref: "#/components/schemas/RunGroup" } }
+        side_effects: { type: array, items: { $ref: "#/components/schemas/SideEffectLog" } }
+    NodeSummary:
+      type: object
+      required: [id, run_id, branch_id, type, label, status, recovery_policy]
+      properties:
+        id: { type: string }
+        run_id: { type: string }
+        branch_id: { type: string }
+        group_id: { type: [string, "null"] }
+        type: { type: string }
+        label: { type: string }
+        tool_name: { type: [string, "null"] }
+        status: { type: string }
+        recovery_policy: { type: string }
+        started_at: { type: [string, "null"], format: date-time }
+        ended_at: { type: [string, "null"], format: date-time }
+        duration_ms: { type: [integer, "null"] }
+        output_preview: { type: [string, "null"] }
+        error: { type: [string, "null"] }
+    NodeDetail:
+      allOf:
+        - $ref: "#/components/schemas/NodeSummary"
+        - type: object
+          properties:
+            input_json: { type: [object, "null"] }
+            output_json: { type: [object, "null"] }
+            classification_reason: { type: [string, "null"] }
+            classification_confidence: { type: [number, "null"] }
+            checkpoint_before_id: { type: [string, "null"] }
+            checkpoint_after_id: { type: [string, "null"] }
+            artifacts: { type: array, items: { $ref: "#/components/schemas/Artifact" } }
+    Edge:
+      type: object
+      required: [id, run_id, branch_id, source_node_id, target_node_id, edge_type]
+      properties:
+        id: { type: string }
+        run_id: { type: string }
+        branch_id: { type: string }
+        source_node_id: { type: string }
+        target_node_id: { type: string }
+        edge_type: { type: string }
+    Checkpoint:
+      type: object
+      required: [id, run_id, branch_id, label, backend, workspace_path, created_at]
+      properties:
+        id: { type: string }
+        run_id: { type: string }
+        branch_id: { type: string }
+        node_id: { type: [string, "null"] }
+        label: { type: string }
+        backend: { type: string }
+        git_ref: { type: [string, "null"] }
+        git_commit_hash: { type: [string, "null"] }
+        workspace_path: { type: string }
+        diff_summary: { type: [string, "null"] }
+        created_at: { type: string, format: date-time }
+    CheckpointCreate:
+      type: object
+      required: [label, backend, git_ref, git_commit_hash, workspace_path, branch_id]
+      properties:
+        label: { type: string }
+        backend: { type: string }
+        git_ref: { type: string }
+        git_commit_hash: { type: string }
+        workspace_path: { type: string }
+        branch_id: { type: string }
+        node_id: { type: [string, "null"] }
+        diff_summary: { type: [string, "null"] }
+        file_hashes_json: { type: [object, "null"] }
+    RunGroup:
+      type: object
+      required: [id, run_id, label, kind, status]
+      properties:
+        id: { type: string }
+        run_id: { type: string }
+        parent_group_id: { type: [string, "null"] }
+        label: { type: string }
+        kind: { type: string }
+        status: { type: string }
+        started_at: { type: [string, "null"], format: date-time }
+        ended_at: { type: [string, "null"], format: date-time }
+    Artifact:
+      type: object
+      required: [id, run_id, type, created_at]
+      properties:
+        id: { type: string }
+        run_id: { type: string }
+        node_id: { type: [string, "null"] }
+        produced_by_node_id: { type: [string, "null"] }
+        type: { type: string }
+        path: { type: [string, "null"] }
+        source_url: { type: [string, "null"] }
+        description: { type: [string, "null"] }
+        content_preview: { type: [string, "null"] }
+        content_hash: { type: [string, "null"] }
+        size_bytes: { type: [integer, "null"] }
+        created_at: { type: string, format: date-time }
+    SideEffectLog:
+      type: object
+      required: [id, run_id, branch_id, node_id, kind, idempotency_key, status]
+      properties:
+        id: { type: integer }
+        run_id: { type: string }
+        branch_id: { type: string }
+        node_id: { type: string }
+        kind: { type: string }
+        idempotency_key: { type: string }
+        external_ref: { type: [string, "null"] }
+        status: { type: string }
+        payload_preview: { type: [string, "null"] }
+        executed_at: { type: [string, "null"], format: date-time }
+    ReplayRequest:
+      type: object
+      required: [node_id]
+      properties:
+        node_id: { type: string }
+        user_context: { type: string }
+        edited_resume_prompt: { type: string }
+    ReplayAttempt:
+      type: object
+      required: [id, run_id, source_node_id, source_checkpoint_id, parent_branch_id, new_branch_id, status, created_at]
+      properties:
+        id: { type: string }
+        run_id: { type: string }
+        source_node_id: { type: string }
+        source_checkpoint_id: { type: string }
+        parent_branch_id: { type: string }
+        new_branch_id: { type: string }
+        resume_prompt: { type: string }
+        status: { type: string }
+        created_at: { type: string, format: date-time }
+        started_at: { type: [string, "null"], format: date-time }
+        ended_at: { type: [string, "null"], format: date-time }
+    ReplayRecommendation:
+      type: object
+      required: [source_node_id, recommended_checkpoint_id, confidence, reason, reuse_node_ids, rerun_node_ids, approval_node_ids, unsafe_node_ids, generated_resume_prompt]
+      properties:
+        source_node_id: { type: string }
+        recommended_checkpoint_id: { type: string }
+        confidence: { type: number }
+        reason: { type: array, items: { type: string } }
+        reuse_node_ids: { type: array, items: { type: string } }
+        rerun_node_ids: { type: array, items: { type: string } }
+        approval_node_ids: { type: array, items: { type: string } }
+        unsafe_node_ids: { type: array, items: { type: string } }
+        generated_resume_prompt: { type: string }
+    Runner:
+      type: object
+      required: [id, name, status, claude_code_available, version, created_at]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        machine_id: { type: [string, "null"] }
+        status: { type: string }
+        last_heartbeat_at: { type: [string, "null"], format: date-time }
+        current_run_id: { type: [string, "null"] }
+        claude_code_available: { type: boolean }
+        version: { type: string }
+        created_at: { type: string, format: date-time }
+    RunnerHeartbeat:
+      type: object
+      required: [runner_id, status, version, claude_code_available]
+      properties:
+        runner_id: { type: string }
+        status: { type: string }
+        current_run_id: { type: [string, "null"] }
+        version: { type: string }
+        claude_code_available: { type: boolean }
+    PolicyOverride:
+      type: object
+      required: [recovery_policy]
+      properties:
+        recovery_policy: { type: string }
+        reason: { type: string }

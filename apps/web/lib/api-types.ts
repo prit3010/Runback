@@ -83,7 +83,8 @@ export interface paths {
         /** List runs */
         get: operations["listRuns"];
         put?: never;
-        post?: never;
+        /** Create a Run */
+        post: operations["createRun"];
         delete?: never;
         options?: never;
         head?: never;
@@ -118,6 +119,23 @@ export interface paths {
         get: operations["getRunDag"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/runs/{runId}/checkpoints": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Persist a checkpoint produced by the runner */
+        post: operations["createCheckpoint"];
         delete?: never;
         options?: never;
         head?: never;
@@ -294,6 +312,19 @@ export interface components {
             /** Format: date-time */
             created_at: string;
         };
+        RunCreate: {
+            id: string;
+            flow_id?: string | null;
+            flow_version_id?: string | null;
+            runner_id?: string | null;
+            run_kind: string;
+            status: string;
+            original_prompt: string;
+            repo_path: string;
+            workspace_path?: string | null;
+            root_branch_id: string;
+            current_branch_id: string;
+        };
         RunDag: {
             run: components["schemas"]["Run"];
             nodes: components["schemas"]["NodeSummary"][];
@@ -350,6 +381,17 @@ export interface components {
             diff_summary?: string | null;
             /** Format: date-time */
             created_at: string;
+        };
+        CheckpointCreate: {
+            label: string;
+            backend: string;
+            git_ref: string;
+            git_commit_hash: string;
+            workspace_path: string;
+            branch_id: string;
+            node_id?: string | null;
+            diff_summary?: string | null;
+            file_hashes_json?: Record<string, never> | null;
         };
         RunGroup: {
             id: string;
@@ -646,6 +688,37 @@ export interface operations {
             };
         };
     };
+    createRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RunCreate"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Run"];
+                };
+            };
+            /** @description Run already exists */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     getRun: {
         parameters: {
             query?: never;
@@ -704,6 +777,39 @@ export interface operations {
             };
             /** @description Not implemented */
             501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    createCheckpoint: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                runId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CheckpointCreate"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Checkpoint"];
+                };
+            };
+            /** @description Unknown run */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

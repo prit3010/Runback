@@ -1,9 +1,13 @@
 """Runback CLI entrypoint."""
 from __future__ import annotations
 
-import sys
-
 import click
+
+from runback.commands.claude_cmd import claude as claude_cmd
+from runback.commands.dev_cmd import dev as dev_cmd
+from runback.commands.init_cmd import init as init_cmd
+from runback.commands.replay_cmd import replay as replay_cmd
+from runback.commands.runner_cmd import runner as runner_cmd
 
 
 @click.group()
@@ -12,42 +16,11 @@ def cli() -> None:
     """Runback - checkpointing and replay for Claude Code workflows."""
 
 
-@cli.command()
-def init() -> None:
-    """Initialize Runback hooks in the current git repo."""
-    click.echo("Not implemented (stub)", err=True)
-    sys.exit(2)
-
-
-@cli.command()
-def dev() -> None:
-    """Start backend, frontend, and runner daemon together."""
-    click.echo("Not implemented (stub)", err=True)
-    sys.exit(2)
-
-
-@cli.command()
-@click.argument("prompt", required=True)
-def claude(prompt: str) -> None:
-    """Launch a one-shot Claude Code run captured by Runback."""
-    click.echo(f"Not implemented (stub) - would run: {prompt}", err=True)
-    sys.exit(2)
-
-
-@cli.command()
-@click.argument("run_id", required=True)
-@click.argument("node_id", required=True)
-def replay(run_id: str, node_id: str) -> None:
-    """Replay a failed run from the nearest safe checkpoint of NODE_ID."""
-    click.echo(f"Not implemented (stub) - would replay {run_id} from {node_id}", err=True)
-    sys.exit(2)
-
-
-@cli.command()
-def runner() -> None:
-    """Start the runner daemon."""
-    click.echo("Not implemented (stub)", err=True)
-    sys.exit(2)
+cli.add_command(init_cmd)
+cli.add_command(dev_cmd)
+cli.add_command(claude_cmd)
+cli.add_command(replay_cmd)
+cli.add_command(runner_cmd)
 
 
 if __name__ == "__main__":

@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
+from datetime import UTC, datetime
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field
@@ -156,6 +158,44 @@ def _serialize_artifact(a: Artifact) -> dict:
     }
 
 
+@router.post("", status_code=201)
+def create_run(payload: dict[str, Any]) -> dict[str, Any]:
+    required = {
+        "id",
+        "run_kind",
+        "status",
+        "original_prompt",
+        "repo_path",
+        "root_branch_id",
+        "current_branch_id",
+    }
+    missing = required - set(payload)
+    if missing:
+        raise HTTPException(status_code=400, detail=f"missing fields: {sorted(missing)}")
+    with Session(engine) as session:
+        if session.get(Run, payload["id"]) is not None:
+            raise HTTPException(status_code=409, detail="run already exists")
+        run = Run(
+            id=payload["id"],
+            flow_id=payload.get("flow_id"),
+            flow_version_id=payload.get("flow_version_id"),
+            runner_id=payload.get("runner_id"),
+            run_kind=payload["run_kind"],
+            status=payload["status"],
+            original_prompt=payload["original_prompt"],
+            repo_path=payload["repo_path"],
+            workspace_path=payload.get("workspace_path"),
+            root_branch_id=payload["root_branch_id"],
+            current_branch_id=payload["current_branch_id"],
+            started_at=datetime.now(UTC),
+            created_at=datetime.now(UTC),
+        )
+        session.add(run)
+        session.commit()
+        session.refresh(run)
+        return _serialize_run(run)
+
+
 @router.get("")
 def list_runs(status: str | None = Query(default=None)) -> list[dict]:
     with Session(engine) as session:
@@ -173,6 +213,39 @@ def get_run(run_id: str) -> dict:
         if row is None:
             raise HTTPException(status_code=404, detail=f"run not found: {run_id}")
         return _serialize_run(row)
+
+
+@router.post("/{run_id}/checkpoints", status_code=201)
+def create_checkpoint(run_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    required = {"label", "backend", "git_ref", "git_commit_hash", "workspace_path", "branch_id"}
+    missing = required - set(payload)
+    if missing:
+        raise HTTPException(status_code=400, detail=f"missing fields: {sorted(missing)}")
+    with Session(engine) as session:
+        run = session.get(Run, run_id)
+        if run is None:
+            raise HTTPException(status_code=404, detail=f"unknown run {run_id}")
+        existing_count = len(
+            list(session.exec(select(Checkpoint).where(Checkpoint.run_id == run_id)))
+        )
+        checkpoint = Checkpoint(
+            id=f"cp_{run_id[-8:]}_{existing_count}",
+            run_id=run_id,
+            branch_id=payload["branch_id"],
+            node_id=payload.get("node_id"),
+            label=payload["label"],
+            backend=payload["backend"],
+            git_ref=payload["git_ref"],
+            git_commit_hash=payload["git_commit_hash"],
+            workspace_path=payload["workspace_path"],
+            diff_summary=payload.get("diff_summary"),
+            file_hashes_json=payload.get("file_hashes_json"),
+            created_at=datetime.now(UTC),
+        )
+        session.add(checkpoint)
+        session.commit()
+        session.refresh(checkpoint)
+        return _serialize_checkpoint(checkpoint)
 
 
 @router.get("/{run_id}/dag")

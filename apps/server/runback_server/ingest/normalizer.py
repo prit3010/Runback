@@ -24,19 +24,29 @@ def _now() -> datetime:
 class Normalizer:
     runtime_root: Path
 
-    def handle(self, run_id: str, payload: dict[str, Any]) -> None:
+    def handle(
+        self, run_id: str, payload: dict[str, Any], branch_id_override: str | None = None
+    ) -> None:
         event = parse_hook_event(payload)
         with Session(engine) as session:
-            run = self._ensure_run(session, run_id, event)
+            run = self._ensure_run(session, run_id, event, branch_id_override=branch_id_override)
             self._dispatch(session, run, event)
             session.commit()
 
-    def _ensure_run(self, session: Session, run_id: str, event: HookEvent) -> Run:
+    def _ensure_run(
+        self,
+        session: Session,
+        run_id: str,
+        event: HookEvent,
+        branch_id_override: str | None = None,
+    ) -> Run:
         existing = session.get(Run, run_id)
         if existing is not None:
+            if branch_id_override:
+                existing.current_branch_id = branch_id_override
             return existing
 
-        branch = branch_id()
+        branch = branch_id_override or branch_id()
         run = Run(
             id=run_id,
             run_kind="ad_hoc",

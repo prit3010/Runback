@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {"matcher": "*", "hooks": [{"type": "command", "command": "$RUNBACK_HOOK_FORWARD"}]}
+    ],
+    "PreToolUse": [
+      {"matcher": "*", "hooks": [{"type": "command", "command": "$RUNBACK_HOOK_FORWARD"}]}
+    ],
+    "PostToolUse": [
+      {"matcher": "*", "hooks": [{"type": "command", "command": "$RUNBACK_HOOK_FORWARD"}]}
+    ],
+    "Stop": [
+      {"matcher": "*", "hooks": [{"type": "command", "command": "$RUNBACK_HOOK_FORWARD"}]}
+    ]
+  }
+}
