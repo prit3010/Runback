@@ -53,7 +53,8 @@ def test_pretooluse_creates_pending_node(norm):
     assert tool_node.tool_name == "Read"
     assert tool_node.claude_tool_use_id == "t1"
     assert tool_node.input_json == {"file_path": "/tmp/foo.py"}
-    assert tool_node.recovery_policy == "unknown"
+    assert tool_node.recovery_policy == "reuse_cached"
+    assert tool_node.classification_reason
     assert tool_node.started_at is not None
 
 
