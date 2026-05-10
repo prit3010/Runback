@@ -1,0 +1,5 @@
+https://acme-robotics.example.com/blog/polaris-launch
+https://blueleaf.example.com/news/series-b
+https://cobalt-forge.example.com/blog/forge-2-0
+https://driftwave.example.com/news/lena-park-cfo
+https://ember-labs.example.com/blog/spark-1-5

@@ -1,0 +1,3 @@
+.fake-slack/*
+!.fake-slack/.gitkeep
+report.md

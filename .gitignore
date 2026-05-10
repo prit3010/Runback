@@ -32,6 +32,7 @@ Thumbs.db
 # Runback runtime
 .runback/*
 !.runback/.gitkeep
+apps/server/.runback/
 .claude/settings.local.json
 
 # Env files

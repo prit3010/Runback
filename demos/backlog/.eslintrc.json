@@ -1,0 +1,8 @@
+{
+  "env": { "node": true, "jest": true, "es2022": true },
+  "parserOptions": { "ecmaVersion": 2022, "sourceType": "script" },
+  "rules": {
+    "no-unused-vars": "off",
+    "no-undef": "error"
+  }
+}

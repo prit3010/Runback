@@ -1,0 +1,103 @@
+#!/bin/sh
+# Runback demo stub for the GitHub CLI. It never contacts GitHub.
+
+set -eu
+
+DEMO_DIR="${RUNBACK_DEMO_BACKLOG_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
+PR_DIR="${DEMO_DIR}/.fake-prs"
+mkdir -p "$PR_DIR"
+
+json_string() {
+  python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))'
+}
+
+case "${1:-}" in
+  pr)
+    shift
+    case "${1:-}" in
+      create)
+        shift
+        TITLE=""
+        BODY=""
+        BASE="main"
+        HEAD=""
+        while [ "$#" -gt 0 ]; do
+          case "$1" in
+            --title) TITLE="${2:-}"; shift 2 ;;
+            --title=*) TITLE="${1#--title=}"; shift ;;
+            --body) BODY="${2:-}"; shift 2 ;;
+            --body=*) BODY="${1#--body=}"; shift ;;
+            --body-file) BODY="$(cat "${2:-/dev/null}" 2>/dev/null || true)"; shift 2 ;;
+            --base) BASE="${2:-main}"; shift 2 ;;
+            --base=*) BASE="${1#--base=}"; shift ;;
+            --head) HEAD="${2:-}"; shift 2 ;;
+            --head=*) HEAD="${1#--head=}"; shift ;;
+            --fill|--draft|--web) shift ;;
+            *) shift ;;
+          esac
+        done
+
+        if [ -z "$HEAD" ]; then
+          HEAD="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown-branch)"
+        fi
+
+        SAFE_BRANCH="$(printf '%s' "$HEAD" | tr '/ ' '__')"
+        OUT_FILE="${PR_DIR}/${SAFE_BRANCH}.json"
+        if [ -f "$OUT_FILE" ]; then
+          EXISTING_URL="$(grep '"url"' "$OUT_FILE" | head -n1 | sed 's/.*"url": *"\([^"]*\)".*/\1/')"
+          echo "a pull request for branch \"$HEAD\" already exists: $EXISTING_URL" >&2
+          exit 1
+        fi
+
+        HASH="$(printf '%s' "$HEAD" | cksum | awk '{print $1}')"
+        PR_NUM="$((100 + (HASH % 900)))"
+        PR_URL="https://github.com/runback-demo/backlog/pull/${PR_NUM}"
+        TIMESTAMP="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+        {
+          printf '{\n'
+          printf '  "number": %s,\n' "$PR_NUM"
+          printf '  "url": "%s",\n' "$PR_URL"
+          printf '  "title": %s,\n' "$(printf '%s' "$TITLE" | json_string)"
+          printf '  "body": %s,\n' "$(printf '%s' "$BODY" | json_string)"
+          printf '  "base": "%s",\n' "$BASE"
+          printf '  "head": "%s",\n' "$HEAD"
+          printf '  "createdAt": "%s",\n' "$TIMESTAMP"
+          printf '  "fakePR": true\n'
+          printf '}\n'
+        } > "$OUT_FILE"
+
+        echo "$PR_URL"
+        exit 0
+        ;;
+      list)
+        ls -1 "$PR_DIR" 2>/dev/null | grep '\.json$' | while read -r f; do
+          grep '"url"' "$PR_DIR/$f" | head -n1 | sed 's/.*"url": *"\([^"]*\)".*/\1/'
+        done
+        exit 0
+        ;;
+      view|status)
+        echo "(fake gh) $1 not implemented in stub" >&2
+        exit 0
+        ;;
+      *)
+        echo "(fake gh) pr ${1:-} ignored" >&2
+        exit 0
+        ;;
+    esac
+    ;;
+  auth)
+    case "${2:-}" in
+      status) echo "Logged in to github.com as runback-demo (stub)"; exit 0 ;;
+      *) exit 0 ;;
+    esac
+    ;;
+  --version)
+    echo "gh version 2.0.0-fake (Runback demo stub)"
+    exit 0
+    ;;
+  *)
+    echo "(fake gh) command '${1:-}' is a no-op in the demo stub" >&2
+    exit 0
+    ;;
+esac

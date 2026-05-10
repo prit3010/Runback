@@ -1,0 +1,67 @@
+#!/bin/sh
+# Runback demo stub for slack-cli. It writes posts to .fake-slack/.
+
+set -eu
+
+DEMO_DIR="${RUNBACK_DEMO_RESEARCH_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
+SLACK_DIR="${DEMO_DIR}/.fake-slack"
+mkdir -p "$SLACK_DIR"
+
+case "${1:-}" in
+  post)
+    shift
+    CHANNEL=""
+    MESSAGE=""
+    while [ "$#" -gt 0 ]; do
+      case "$1" in
+        --channel) CHANNEL="${2:-}"; shift 2 ;;
+        --channel=*) CHANNEL="${1#--channel=}"; shift ;;
+        --message) MESSAGE="${2:-}"; shift 2 ;;
+        --message=*) MESSAGE="${1#--message=}"; shift ;;
+        --message-file) MESSAGE="$(cat "${2:-/dev/null}" 2>/dev/null || true)"; shift 2 ;;
+        --message-file=*) MESSAGE="$(cat "${1#--message-file=}" 2>/dev/null || true)"; shift ;;
+        *) shift ;;
+      esac
+    done
+
+    if [ -z "$CHANNEL" ]; then
+      echo "(fake slack-cli) post requires --channel" >&2
+      exit 2
+    fi
+    if [ -z "$MESSAGE" ]; then
+      echo "(fake slack-cli) post requires --message or --message-file" >&2
+      exit 2
+    fi
+
+    HASH="$(printf '%s' "$MESSAGE" | shasum -a 256 | cut -c1-12)"
+    SAFE_CHANNEL="$(printf '%s' "$CHANNEL" | tr '#' '_' | tr -cd '[:alnum:]_-')"
+    TIMESTAMP="$(date -u +%Y%m%dT%H%M%SZ)"
+    OUT_FILE="${SLACK_DIR}/${TIMESTAMP}-${SAFE_CHANNEL}-${HASH}.txt"
+
+    EXISTING="$(ls -1 "$SLACK_DIR" 2>/dev/null | grep -- "-${SAFE_CHANNEL}-${HASH}\\.txt$" | head -n1 || true)"
+    if [ -n "$EXISTING" ]; then
+      echo "(fake slack-cli) duplicate post suppressed; existing: ${SLACK_DIR}/${EXISTING}" >&2
+      echo "ts=$(printf '%s' "$EXISTING" | cut -c1-16)"
+      exit 0
+    fi
+
+    {
+      echo "channel=${CHANNEL}"
+      echo "ts=${TIMESTAMP}"
+      echo "hash=${HASH}"
+      echo "---"
+      printf '%s\n' "$MESSAGE"
+    } > "$OUT_FILE"
+
+    echo "posted to ${CHANNEL}: ${TIMESTAMP} (sha256:${HASH})"
+    exit 0
+    ;;
+  --version)
+    echo "slack-cli 0.0.0-fake (Runback demo stub)"
+    exit 0
+    ;;
+  *)
+    echo "(fake slack-cli) command '${1:-}' is a no-op in the demo stub" >&2
+    exit 0
+    ;;
+esac

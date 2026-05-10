@@ -1,0 +1,17 @@
+{
+  "name": "runback-demo-backlog",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Runback Demo 1 fixture: a tiny Node.js app with 5 tracked bugs in BACKLOG.md.",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "jest --runInBand --colors",
+    "test:baseline": "jest tests/baseline.test.js --runInBand",
+    "lint": "eslint src tests"
+  },
+  "devDependencies": {
+    "jest": "29.7.0",
+    "eslint": "8.57.0"
+  },
+  "dependencies": {}
+}
