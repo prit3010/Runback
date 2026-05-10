@@ -1,0 +1,4 @@
+node_modules/
+coverage/
+.fake-prs/*
+!.fake-prs/.gitkeep
