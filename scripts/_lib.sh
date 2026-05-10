@@ -27,7 +27,7 @@ rb_runback() {
   if command -v runback >/dev/null 2>&1; then
     runback "$@"
   else
-    uv run runback "$@"
+    uv run --project packages/runback-cli runback "$@"
   fi
 }
 
@@ -51,7 +51,7 @@ rb_preflight_stack() {
     rb_require_cmd uv || return 1
   fi
   rb_wait_for_http "http://localhost:8000/api/runs" 5 || {
-    rb_err "Backend not reachable. Is 'uv run runback dev' running?"
+    rb_err "Backend not reachable. Is 'uv run --project packages/runback-cli runback dev' running?"
     return 1
   }
   rb_wait_for_http "http://localhost:3000" 5 || {

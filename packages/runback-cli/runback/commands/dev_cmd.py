@@ -21,6 +21,14 @@ def dev(no_web: bool, no_server: bool, no_runner: bool) -> None:
     settings = get_settings()
     procs: list[tuple[str, subprocess.Popen]] = []
     if not no_server:
+        click.secho("preparing backend database", fg="cyan")
+        migration = subprocess.run(
+            ["uv", "run", "--extra", "dev", "alembic", "upgrade", "head"],
+            cwd="apps/server",
+            env=os.environ.copy(),
+        )
+        if migration.returncode != 0:
+            raise click.ClickException("backend database migration failed")
         click.secho(f"starting backend on port {settings.server_port}", fg="cyan")
         procs.append(
             (

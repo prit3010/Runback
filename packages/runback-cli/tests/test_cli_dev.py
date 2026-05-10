@@ -54,3 +54,48 @@ def test_dev_help() -> None:
     )
     assert result.returncode == 0
     assert "backend" in result.stdout.lower()
+
+
+def test_dev_prepares_database_before_starting_backend(monkeypatch) -> None:
+    calls = []
+
+    class FakeProc:
+        def __init__(self, args, **kwargs):
+            self.args = args
+            self.kwargs = kwargs
+
+        def poll(self):
+            return 0
+
+        def send_signal(self, _signal):
+            return None
+
+        def wait(self, timeout=None):
+            return 0
+
+        def kill(self):
+            return None
+
+    def fake_run(args, **kwargs):
+        calls.append(("run", args, kwargs))
+        return subprocess.CompletedProcess(args, 0)
+
+    def fake_popen(args, **kwargs):
+        calls.append(("popen", args, kwargs))
+        return FakeProc(args, **kwargs)
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setattr(subprocess, "Popen", fake_popen)
+    monkeypatch.setattr(time, "sleep", lambda _seconds: None)
+
+    from click.testing import CliRunner
+    from runback.commands.dev_cmd import dev
+
+    result = CliRunner().invoke(dev, ["--no-web", "--no-runner"])
+
+    assert result.exit_code == 0
+    assert calls[0][0] == "run"
+    assert calls[0][1] == ["uv", "run", "--extra", "dev", "alembic", "upgrade", "head"]
+    assert calls[0][2]["cwd"] == "apps/server"
+    assert calls[1][0] == "popen"
+    assert "uvicorn" in calls[1][1]
